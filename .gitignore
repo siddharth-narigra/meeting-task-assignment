@@ -1,0 +1,17 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE settings
+.vscode/
+.idea/
+
+# Audio files (optional - remove this line if you want to include meeting.mp3)
+*.mp3
+
+# Output files
+tasks.json

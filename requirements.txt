@@ -1,0 +1,18 @@
+# Meeting Task Assignment System - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Speech-to-Text
+openai-whisper>=20231117    # Local Whisper model for audio transcription
+
+# NLP Processing
+spacy>=3.7.0                # Natural language processing for sentence segmentation
+
+# Note: You also need to download the spaCy English model:
+# python -m spacy download en_core_web_sm
+
+# System Dependency (not pip):
+# FFmpeg must be installed on your system for Whisper to process audio
+# Windows: choco install ffmpeg  OR  winget install ffmpeg
+# Mac: brew install ffmpeg
+# Linux: sudo apt install ffmpeg
+
