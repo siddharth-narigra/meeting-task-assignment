@@ -1,3 +1,6 @@
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![Whisper](https://img.shields.io/badge/OpenAI-Whisper-orange.svg)
 # Meeting Task Assignment System
 
 Automatically extract and assign tasks from meeting audio recordings using speech-to-text and custom NLP logic.
