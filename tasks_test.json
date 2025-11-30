@@ -1,0 +1,56 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "task": "Update all environment keys and push a fixed build today.",
+      "description": "Mehul, update all environment keys and push a fixed build today.",
+      "assigned_to": "Mehul",
+      "deadline": "Today",
+      "priority": "Medium",
+      "dependencies": [],
+      "reason": "Directly mentioned in meeting",
+      "deadline_iso": "2025-11-30T18:12:38.017472+05:30"
+    },
+    {
+      "id": 2,
+      "task": "Once that's done, Sarah, regenerate the screenshots for the...",
+      "description": "Once that's done, Sarah, regenerate the screenshots for the App Store. Don't start until Mehul's build passes.",
+      "assigned_to": "Sarah",
+      "deadline": null,
+      "priority": "Medium",
+      "dependencies": [],
+      "reason": "Directly mentioned in meeting"
+    },
+    {
+      "id": 3,
+      "task": "Review the legal copy for the new terms of service.",
+      "description": "Also, someone has to review the legal copy for the new terms of service.",
+      "assigned_to": "Priya",
+      "deadline": null,
+      "priority": "Medium",
+      "dependencies": [],
+      "reason": "Skills: Legal, Review"
+    },
+    {
+      "id": 4,
+      "task": "Take that and send the approved version to DevOps by...",
+      "description": "Priya, take that and send the approved version to DevOps by Thursday.",
+      "assigned_to": "Priya",
+      "deadline": "By Thursday",
+      "priority": "High",
+      "dependencies": [],
+      "reason": "Directly mentioned in meeting",
+      "deadline_iso": "2025-12-04T00:00:00+05:30"
+    },
+    {
+      "id": 5,
+      "task": "After receiving that, update the production banner text.",
+      "description": "DevOps, after receiving that, update the production banner text.",
+      "assigned_to": "DevOps",
+      "deadline": null,
+      "priority": "Medium",
+      "dependencies": [],
+      "reason": "Directly mentioned in meeting"
+    }
+  ]
+}

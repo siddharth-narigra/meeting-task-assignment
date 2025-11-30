@@ -17,7 +17,94 @@ Why this approach?
 
 import re
 from typing import List, Dict, Optional, Tuple
+from rapidfuzz import fuzz, process
 from models import Task, TeamMember
+
+
+def match_name_to_team(recognized_name: str, team_members: List[TeamMember], threshold: int = 60) -> Optional[str]:
+    """
+    Match a recognized name from transcript to a team member using fuzzy matching.
+    
+    Uses rapidfuzz for fast, production-grade fuzzy string matching.
+    
+    Args:
+        recognized_name: Name as transcribed (may be misspelled)
+        team_members: List of team members to match against
+        threshold: Minimum match score (0-100), default 60%
+        
+    Returns:
+        Matched team member name, or None if no good match
+        
+    Example:
+        match_name_to_team("Rhea", team) → "Riya" (if Riya is in team)
+        match_name_to_team("Roghav", team) → "Raghav"
+    """
+    if not recognized_name or not team_members:
+        return None
+    
+    # Normalize the input
+    recognized_name = recognized_name.strip().lower()
+    
+    # Build list of team member names
+    team_names = [m.name for m in team_members]
+    team_names_lower = [n.lower() for n in team_names]
+    
+    # Try exact match first (fast path)
+    if recognized_name in team_names_lower:
+        idx = team_names_lower.index(recognized_name)
+        return team_names[idx]
+    
+    # Use rapidfuzz for fuzzy matching
+    result = process.extractOne(
+        recognized_name, 
+        team_names_lower, 
+        scorer=fuzz.ratio
+    )
+    
+    if result and result[1] >= threshold:
+        # result is (matched_string, score, index)
+        idx = result[2]
+        return team_names[idx]
+    
+    return None
+
+
+def handle_someone_assignment(task: 'Task', team_members: List[TeamMember]) -> Optional[str]:
+    """
+    Handle implicit "someone" assignments by matching to role/skills.
+    
+    When transcript says "someone" or "let someone", try to find
+    the best team member based on role mentions in the task.
+    
+    Args:
+        task: The task with implicit assignment
+        team_members: List of available team members
+        
+    Returns:
+        Name of best matching team member, or None if no match
+    """
+    description_lower = task.description.lower()
+    
+    # Check if any role is mentioned: "someone from backend", "backend team"
+    role_keywords = {
+        'backend': ['backend', 'server', 'api', 'database'],
+        'frontend': ['frontend', 'ui', 'interface', 'react'],
+        'qa': ['qa', 'test', 'testing', 'quality'],
+        'design': ['design', 'ux', 'figma', 'mockup'],
+        'content': ['content', 'writing', 'documentation', 'faq', 'docs'],
+    }
+    
+    for role_type, keywords in role_keywords.items():
+        for keyword in keywords:
+            if keyword in description_lower:
+                # Find team member with matching role
+                for member in team_members:
+                    member_role_lower = member.role.lower()
+                    if role_type in member_role_lower or any(kw in member_role_lower for kw in keywords):
+                        return member.name
+    
+    # No role match found
+    return None
 
 
 class TaskAssigner:
@@ -286,14 +373,32 @@ class TaskAssigner:
         print("\nAssigning tasks to team members...")
         
         for task in tasks:
-            # If already assigned (direct mention), keep it
+            # If already assigned (direct mention), validate against team
             if task.assigned_to:
-                print(f"  Task #{task.id}: Already assigned to {task.assigned_to}")
-                if not task.reason:
-                    task.reason = "Directly mentioned in meeting"
-                continue
+                # Verify assignment exists in team (handles fuzzy matching edge cases)
+                matched = match_name_to_team(task.assigned_to, self.team_members)
+                if matched:
+                    task.assigned_to = matched  # Use canonical name
+                    print(f"  Task #{task.id}: Already assigned to {task.assigned_to}")
+                    if not task.reason:
+                        task.reason = "Directly mentioned in meeting"
+                    continue
+                else:
+                    # Name doesn't match any team member, clear and reassign
+                    print(f"  Task #{task.id}: '{task.assigned_to}' not in team, will reassign")
+                    task.assigned_to = None
             
-            # Find the best person for this task
+            # Check for "someone" implicit assignment
+            if 'someone' in task.description.lower():
+                someone_match = handle_someone_assignment(task, self.team_members)
+                if someone_match:
+                    task.assigned_to = someone_match
+                    task.reason = "Matched by role (implicit 'someone' assignment)"
+                    task.flag_for_review = True
+                    print(f"  Task #{task.id}: Assigned to {someone_match} (someone → role match)")
+                    continue
+            
+            # Find the best person for this task based on skills/role
             best_member, reason = self.find_best_assignee(task)
             
             if best_member:

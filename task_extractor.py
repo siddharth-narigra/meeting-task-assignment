@@ -31,7 +31,10 @@ IMPROVEMENTS v3:
 
 import re
 import spacy  # type: ignore
+import dateparser
+from datetime import datetime
 from typing import List, Tuple, Optional, Any
+from rapidfuzz import fuzz, process
 from models import Task, TeamMember
 
 
@@ -236,31 +239,71 @@ class TaskExtractor:
         r'\btackle\b',                     # "tackle"
         r'\bwork\s+on\b',                  # "work on"
         r'\bhandle\b',                     # "handle"
+        # MVP additions
+        r'\binvestigate\b',                # "investigate the issue"
+        r'\bprepare\s+(?:a\s+)?report\b',  # "prepare a report"
+        r'\bpick\s+(?:that\s+)?up\b',      # "pick that up", "pick up"
+        r'\bfinish\s+(?:it|this|that)?\b', # "finish it", "finish this"
+        r'\bdraft\b',                       # "draft the FAQ"
+        r'\bcan\s+you\s+(?:handle|do|take|finish)\b',  # "can you handle that"
+        r'\blet\s+\w+\s+(?:handle|do|take)\b',  # "let Karan handle"
+        r'\bwill\s+pick\s+(?:that\s+)?up\b',  # "will pick that up"
+        r'\bstart\s+(?:on|with)?\b',       # "start on the testing"
+        # Direct addressing patterns: "Name, verb..." 
+        r'^[A-Z][a-z]+,\s+\w+',            # "Mehul, update..." - name at start
+        r'\bupdate\s+(?:all\s+)?(?:the\s+)?\w+',  # "update all environment keys"
+        r'\bregenerate\b',                  # "regenerate the screenshots"
+        r'\bpush\s+(?:a\s+)?(?:fixed\s+)?\w+',  # "push a fixed build"
+        r'\bsend\s+(?:the\s+)?(?:\w+\s+)*to\b',  # "send the approved version to"
+        r'\btake\s+that\b',                 # "take that and..."
+        r'\breview\s+(?:the\s+)?\w+',       # "review the legal copy"
     ]
     
     # Action verbs that indicate a task when combined with an object
     # These are checked more carefully to avoid false positives
     ACTION_VERB_PATTERNS = [
         r'\bfix\s+(?:the\s+)?(?:\w+\s+){0,2}(?:bug|issue|problem|error)\b',  # "fix the login bug"
-        r'\bupdate\s+(?:the\s+)?(?:\w+\s+){0,3}(?:doc|documentation|docs)\b',  # "update the API documentation"
+        r'\bupdate\s+(?:the\s+)?(?:\w+\s+){0,3}(?:doc|documentation|docs|faq)\b',  # "update the API documentation"
         r'\bwrite\s+(?:\w+\s+){0,2}(?:test|tests|unit test)\b',  # "write unit tests"
         r'\bdesign\s+(?:the\s+)?(?:new\s+)?(?:\w+\s+){0,2}(?:screen|ui|interface|page|flow)\b',  # "design the new screens"
         r'\boptimize\s+(?:the\s+)?(?:\w+\s+){0,2}(?:database|performance|query|api)\b',  # "optimize database"
         r'\bcreate\s+(?:the\s+)?(?:new\s+)?\w+\b',  # "create the new X"
         r'\bimplement\s+(?:the\s+)?(?:new\s+)?\w+\b',  # "implement the feature"
+        # MVP additions
+        r'\binvestigate\s+(?:the\s+)?(?:\w+\s+){0,3}(?:root\s+cause|issue|problem|bug|error|logs?|spikes?)\b',
+        r'\bprepare\s+(?:a\s+)?(?:\w+\s+){0,2}(?:report|summary|document)\b',
+        r'\bdraft\s+(?:the\s+)?(?:\w+\s+){0,2}(?:faq|updates?|docs?|documentation)\b',
+        r'\bredesign\s+(?:the\s+)?(?:\w+\s+){0,2}(?:homepage|page|screen|ui)\b',
+        r'\bfinalize\s+(?:the\s+)?(?:\w+\s+){0,2}\w+\b',  # "finalize the homepage"
+        r'\btest(?:ing)?\s+(?:the\s+)?(?:for\s+)?(?:\w+\s+){0,2}(?:module|feature|cart|checkout)\b',
     ]
     
     # ==========================================================================
     # FALSE POSITIVE PATTERNS (sentences to EXCLUDE)
     # ==========================================================================
     # These sentences should NOT be treated as tasks
+    # NOTE: We do NOT blanket-filter all questions (r'\?$') because some questions
+    # contain direct assignments like "Ananya, can you handle that by tomorrow?"
     FALSE_POSITIVE_PATTERNS = [
         r'^(?:hi|hello|hey)\s+everyone',           # Greetings: "Hi everyone"
         r'^let\'?s\s+discuss',                     # "Let's discuss" (intro, not task)
         r'^let\'?s\s+talk\s+about',               # "Let's talk about"
         r'\bdidn\'?t\s+you\s+work\b',             # Questions: "didn't you work on..."
         r'\byou\'?re\s+good\s+(?:at|with)\b',     # "you're good with X" (not a task)
-        r'\?$',                                    # Any sentence ending with ?
+        r'^what\s+(?:do|does|is|are)\b.*\?$',     # "What do you think?" type questions
+        r'^how\s+(?:do|does|is|are|about)\b.*\?$', # "How is the progress?" type questions
+        r'^why\s+(?:do|does|is|are)\b.*\?$',       # "Why is this broken?" type questions
+    ]
+    
+    # ==========================================================================
+    # ASSIGNMENT QUESTION PATTERNS
+    # ==========================================================================
+    # Questions that ARE task assignments - these should be treated as tasks
+    # even though they end with "?"
+    ASSIGNMENT_QUESTION_PATTERNS = [
+        r'\bcan\s+you\s+(?:handle|do|take|finish|work\s+on)\b.*\?$',  # "can you handle that?"
+        r'\bwill\s+you\s+(?:handle|do|take|finish|work\s+on)\b.*\?$', # "will you handle that?"
+        r'\bcould\s+you\s+(?:handle|do|take|finish|work\s+on)\b.*\?$', # "could you handle that?"
     ]
     
     # ==========================================================================
@@ -275,21 +318,36 @@ class TaskExtractor:
         r'^(?:so\s+)?let\'?s\s+plan\b',                       # "So let's plan this..."
         r'^this\s+depends\b',                                  # "This depends on..."
         r'^that\s+(?:needs?|should|can)\b',                   # "That needs to..."
+        r'^don\'?t\s+start\s+until\b',                        # "Don't start until..."
+        r'^wait\s+(?:for|until)\b',                           # "Wait for...", "Wait until..."
     ]
     
     # ==========================================================================
     # DEADLINE PATTERNS
     # ==========================================================================
     DEADLINE_PATTERNS = [
+        # Today patterns
+        (r'\bby\s+today\b', 'Today'),
+        (r'\btoday\b', 'Today'),
+        (r'\btonight\b', 'Tonight'),
+        (r'\bby\s+end\s+of\s+today\b', 'End of today'),
+        
         # Specific times
         (r'\bby\s+tomorrow\s+(?:morning|afternoon|evening|night)\b', None),
         (r'\btomorrow\s+(?:morning|afternoon|evening|night)\b', None),
         (r'\bby\s+tomorrow\b', 'Tomorrow'),
         (r'\btomorrow\b', 'Tomorrow'),
         
+        # Day of week with time of day (must come before plain day patterns)
+        (r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:morning|afternoon|evening|night)\b', None),
+        (r'\bfor\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:morning|afternoon|evening|night)\b', None),
+        
+        # "before next Thursday's announcement" pattern
+        (r'\bbefore\s+next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\'?s)?\b', None),
+        (r'\bbefore\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\'?s)?\b', None),
+        
         # Day of week
         (r'\bby\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', None),
-        (r'\bbefore\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\'?s)?\b', None),
         (r'\bfor\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', None),
         (r'\b(?:until|til)\s+(?:this\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', None),
         (r'\bwaits?\s+until\s+(?:next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', None),
@@ -304,6 +362,9 @@ class TaskExtractor:
         (r'\bnext\s+sprint\b', 'Next sprint'),
         (r'\bnext\s+month\b', 'Next month'),
         
+        # Standalone weekday (for "so QA will pick that up Wednesday")
+        (r'\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b', None),
+        
         # ASAP / Urgent timing
         (r'\basap\b', 'ASAP'),
         (r'\bas\s+soon\s+as\s+possible\b', 'ASAP'),
@@ -313,13 +374,40 @@ class TaskExtractor:
     ]
     
     # ==========================================================================
-    # PRIORITY PATTERNS  
+    # PRIORITY MAPPING (Simple keyword-based)
     # ==========================================================================
-    PRIORITY_KEYWORDS = {
-        'critical': ['critical', 'blocking', 'blocker', 'showstopper', 'emergency'],
-        'high': ['high priority', 'important', 'urgent', 'asap', 'immediately', 'right away'],
-        'medium': ['medium priority', 'normal', 'standard'],
-        'low': ['low priority', 'can wait', 'when possible', 'nice to have', 'eventually'],
+    # Maps keywords to priority levels - first match wins
+    PRIORITY_MAP = {
+        # Critical
+        'critical': 'Critical',
+        'urgent': 'Critical',
+        'asap': 'Critical',
+        'blocker': 'Critical',
+        'blocking': 'Critical',
+        'emergency': 'Critical',
+        'showstopper': 'Critical',
+        # High
+        'prioritize': 'High',
+        'prioritise': 'High',  # British spelling
+        'important': 'High',
+        'high priority': 'High',
+        'before release': 'High',
+        'by thursday': 'High',
+        'by friday': 'High',
+        'before thursday': 'High',
+        'before friday': 'High',
+        # Medium (default, but can be explicitly mentioned)
+        'wednesday': 'Medium',
+        'next monday': 'Medium',
+        'end of week': 'Medium',
+        'this week': 'Medium',
+        # Low
+        'no rush': 'Low',
+        'can wait': 'Low',
+        'low priority': 'Low',
+        'when possible': 'Low',
+        'nice to have': 'Low',
+        'eventually': 'Low',
     }
     
     # ==========================================================================
@@ -332,6 +420,12 @@ class TaskExtractor:
         r'\bwaiting\s+(?:for|on)\b',       # "waiting for", "waiting on"
         r'\bblocked\s+by\b',               # "blocked by"
         r'\bfirst\s+(?:we\s+)?need\b',     # "first need", "first we need"
+        # MVP additions
+        r'\bcan\s+only\s+start\s+after\b', # "can only start after"
+        r'\bonly\s+start\s+after\b',       # "only start after"
+        r'\bafter\s+\w+\s+pushes?\b',      # "after Riya pushes"
+        r'\bafter\s+\w+\s+finishes?\b',    # "after Karan finishes"
+        r'\buntil\s+\w+(?:\'s)?\s+\w+\s+(?:passes?|completes?|finishes?)\b',  # "until Mehul's build passes"
     ]
     
     def __init__(self):
@@ -356,6 +450,11 @@ class TaskExtractor:
             for pattern in self.FALSE_POSITIVE_PATTERNS
         ]
         
+        self.compiled_assignment_question_patterns = [
+            re.compile(pattern, re.IGNORECASE)
+            for pattern in self.ASSIGNMENT_QUESTION_PATTERNS
+        ]
+        
         self.compiled_context_patterns = [
             re.compile(pattern, re.IGNORECASE)
             for pattern in self.CONTEXT_PATTERNS
@@ -372,6 +471,21 @@ class TaskExtractor:
         sentences = [sent.text.strip() for sent in doc.sents]
         return sentences
     
+    def is_assignment_question(self, sentence: str) -> bool:
+        """
+        Check if a sentence is an assignment question (task disguised as question).
+        
+        Examples:
+        - "Ananya, can you handle that by tomorrow evening?"
+        - "Will you finish the report by Friday?"
+        
+        These should be treated as tasks, not filtered out.
+        """
+        for pattern in self.compiled_assignment_question_patterns:
+            if pattern.search(sentence):
+                return True
+        return False
+    
     def is_false_positive(self, sentence: str) -> bool:
         """
         Check if a sentence is a false positive (should NOT be a task).
@@ -379,8 +493,14 @@ class TaskExtractor:
         Filters out:
         - Greetings ("Hi everyone")
         - Discussion intros ("Let's discuss")
-        - Questions ("didn't you work on...?")
+        - Rhetorical questions ("didn't you work on...?")
+        
+        But KEEPS assignment questions like "can you handle that?"
         """
+        # First check if it's an assignment question - these are NOT false positives
+        if self.is_assignment_question(sentence):
+            return False
+        
         for pattern in self.compiled_false_positive_patterns:
             if pattern.search(sentence):
                 return True
@@ -439,6 +559,41 @@ class TaskExtractor:
         
         return None
     
+    def parse_deadline_to_iso(self, deadline_text: str, base_date: Optional[datetime] = None) -> Optional[str]:
+        """
+        Parse a deadline text to ISO 8601 format using dateparser.
+        
+        Args:
+            deadline_text: Natural language deadline like "tomorrow evening", "next Thursday"
+            base_date: Reference date for relative parsing (defaults to now)
+            
+        Returns:
+            ISO 8601 formatted date string, or None if parsing fails
+            
+        Examples:
+            "tomorrow evening" → "2025-12-01T18:00:00+05:30"
+            "next Thursday" → "2025-12-04T00:00:00+05:30"
+        """
+        if not deadline_text:
+            return None
+        
+        try:
+            dt = dateparser.parse(
+                deadline_text,
+                settings={
+                    'RELATIVE_BASE': base_date or datetime.now(),
+                    'TIMEZONE': 'Asia/Kolkata',
+                    'RETURN_AS_TIMEZONE_AWARE': True,
+                    'PREFER_DATES_FROM': 'future',
+                }  # type: ignore
+            )
+            if dt:
+                return dt.isoformat()
+        except Exception:
+            pass
+        
+        return None
+    
     def smart_title(self, text: str) -> str:
         """
         Capitalize text properly without messing up apostrophes.
@@ -474,96 +629,40 @@ class TaskExtractor:
     def extract_priority(self, text: str, deadline: Optional[str] = None, 
                          has_critical_dependency: bool = False) -> str:
         """
-        Extract priority using a SCORING SYSTEM.
+        Extract priority using simple keyword matching.
         
-        Scoring factors:
-        - Critical keywords (blocking, critical, etc.) → +3 points
-        - Impact keywords (affecting users, user experience) → +2 points
-        - Release/deadline keywords (release, deploy, ship) → +2 points
-        - Urgent time keywords (immediately, asap, right away) → +2 points
-        - Near deadline (tomorrow, today) → +2 points
-        - This week deadline → +1 point
-        - Explicit weekday mention (Monday, Wednesday, etc.) → +1 point
-        - Depends on Critical/High task → +2 points
-        - Low priority indicators (can wait, nice to have) → -2 points
-        
-        Score mapping:
-        - Score >= 5 → Critical
-        - Score >= 3 → High
-        - Score >= 1 → Medium
-        - Score <= 0 → Low
+        Uses PRIORITY_MAP for keyword-based detection.
+        First match wins - keywords are ordered by priority.
         
         Args:
             text: The task text to analyze
-            deadline: Optional deadline string (used for urgency scoring)
+            deadline: Optional deadline string (used for urgency boost)
             has_critical_dependency: True if task depends on a Critical/High task
             
         Returns:
             Priority level: "Critical", "High", "Medium", or "Low"
         """
         text_lower = text.lower()
-        score = 0
         
-        # Critical keywords (+3)
-        critical_keywords = ['critical', 'blocking', 'blocker', 'showstopper', 'emergency', 'outage']
-        if any(kw in text_lower for kw in critical_keywords):
-            score += 3
-        
-        # Impact keywords (+2) - things affecting users/business
-        impact_keywords = ['affecting', 'impacting', 'user experience', 'users are', 'customers are', 
-                          'broken', 'not working', 'failed', 'failure']
-        if any(kw in text_lower for kw in impact_keywords):
-            score += 2
-        
-        # Release/deployment keywords (+2)
-        release_keywords = ['release', 'deploy', 'deployment', 'ship', 'launch', 'go live', 'production']
-        if any(kw in text_lower for kw in release_keywords):
-            score += 2
-        
-        # Explicit urgency keywords (+2)
-        urgency_keywords = ['urgent', 'urgently', 'immediately', 'right away', 'asap', 'right now']
-        if any(kw in text_lower for kw in urgency_keywords):
-            score += 2
-        
-        # Explicit priority mentions (+2 for high, +3 for critical)
-        if 'high priority' in text_lower or 'top priority' in text_lower:
-            score += 2
-        if 'critical priority' in text_lower or 'highest priority' in text_lower:
-            score += 3
-        
-        # Deadline urgency scoring
+        # Also check the deadline text if provided
         if deadline:
-            deadline_lower = deadline.lower()
-            # Very urgent deadlines (+2)
-            if any(d in deadline_lower for d in ['tomorrow', 'today', 'tonight', 'asap', 'immediately']):
-                score += 2
-            # Moderately urgent deadlines (+1)
-            elif any(d in deadline_lower for d in ['this week', 'end of week']):
-                score += 1
+            text_lower += " " + deadline.lower()
         
-        # Explicit weekday mention (+1) - "Wednesday", "Monday", "Friday" etc.
-        weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-        if any(day in text_lower for day in weekdays):
-            score += 1
+        # Check for keywords in priority order (Critical first, then High, etc.)
+        # The PRIORITY_MAP is ordered so this works correctly
+        for keyword, priority in self.PRIORITY_MAP.items():
+            if keyword in text_lower:
+                # If depending on Critical/High task, boost Medium to High
+                if has_critical_dependency and priority == "Medium":
+                    return "High"
+                return priority
         
-        # Dependency on Critical/High task (+2)
+        # Boost for critical dependency
         if has_critical_dependency:
-            score += 2
-        
-        # Low priority indicators (reduce score, but don't go below -1)
-        low_keywords = ['can wait', 'when possible', 'nice to have', 'eventually', 'no rush', 'low priority']
-        if any(kw in text_lower for kw in low_keywords):
-            score = max(-1, score - 2)
-        
-        # Map score to priority level (adjusted thresholds)
-        if score >= 5:
-            return "Critical"
-        elif score >= 3:
             return "High"
-        elif score >= 1:
-            return "Medium"
-        else:
-            return "Low"
+        
+        # Default to Medium (not Low) - safer default
+        return "Medium"
     
     def has_dependency(self, text: str) -> bool:
         """Check if text mentions a dependency."""
@@ -576,14 +675,41 @@ class TaskExtractor:
         """
         Find if any team member is mentioned in the sentence.
         
-        Uses FUZZY MATCHING to handle Whisper transcription errors:
+        Uses rapidfuzz for robust fuzzy matching to handle Whisper errors:
         - "Sokshi" matches "Sakshi"
-        - "Our June" matches "Arjun"
+        - "Rhea" matches "Riya"
+        - "Roghav" matches "Raghav"
         """
-        for member in team_members:
-            # Use fuzzy matching to handle transcription errors
-            if fuzzy_match(member.name, sentence, threshold=0.65):
-                return member.name
+        if not team_members:
+            return None
+        
+        # Build list of team member names
+        team_names = [m.name for m in team_members]
+        
+        # Extract words from sentence that could be names (capitalized or at start)
+        words = re.findall(r'\b[A-Za-z]+\b', sentence)
+        
+        for word in words:
+            # Skip very short words or common words
+            if len(word) < 3:
+                continue
+            
+            # Try exact match first (fast path)
+            word_lower = word.lower()
+            for name in team_names:
+                if word_lower == name.lower():
+                    return name
+            
+            # Try fuzzy match with rapidfuzz
+            result = process.extractOne(
+                word_lower,
+                [n.lower() for n in team_names],
+                scorer=fuzz.ratio
+            )
+            
+            if result and result[1] >= 65:  # 65% threshold
+                idx = result[2]
+                return team_names[idx]
         
         return None
     
@@ -820,12 +946,16 @@ class TaskExtractor:
                 description = self.correct_name_in_text(description, mentioned_person)
             
             # Step 4: Create Task object
+            # Parse deadline to ISO format
+            deadline_iso = self.parse_deadline_to_iso(deadline) if deadline else None
+            
             task = Task(
                 id=task_id,
                 task=task_title,
                 description=description,
                 assigned_to=mentioned_person,
                 deadline=deadline,
+                deadline_iso=deadline_iso,
                 priority=priority,
                 dependencies=[],
                 reason="Directly mentioned in meeting" if mentioned_person else None

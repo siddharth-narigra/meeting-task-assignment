@@ -68,10 +68,13 @@ class Task:
         task: Short title of the task (e.g., "Fix critical login bug")
         description: The original sentence(s) from the transcript
         assigned_to: Name of the team member assigned (can be None if unassigned)
-        deadline: When the task is due (e.g., "Tomorrow evening", "End of this week")
+        deadline: When the task is due - natural language (e.g., "Tomorrow evening")
+        deadline_iso: ISO 8601 formatted deadline (e.g., "2025-12-01T18:00:00+05:30")
         priority: Priority level - "Critical", "High", "Medium", or "Low"
         dependencies: List of task IDs this task depends on
         reason: Why this person was assigned (for transparency)
+        confidence: Extraction confidence score (0.0 to 1.0)
+        flag_for_review: Whether this task needs human review
     
     Example:
         task = Task(
@@ -80,6 +83,7 @@ class Task:
             description="we need someone to fix the critical login bug...",
             assigned_to="Sakshi",
             deadline="Tomorrow evening",
+            deadline_iso="2025-12-01T18:00:00+05:30",
             priority="Critical",
             dependencies=[],
             reason="Frontend task, directly mentioned"
@@ -90,9 +94,12 @@ class Task:
     description: str
     assigned_to: Optional[str] = None
     deadline: Optional[str] = None
+    deadline_iso: Optional[str] = None
     priority: str = "Medium"
     dependencies: List[int] = field(default_factory=list)
     reason: Optional[str] = None
+    confidence: float = 1.0
+    flag_for_review: bool = False
     # Internal field for tracking if task has unresolved dependency mention
     _has_dependency: bool = field(default=False, repr=False)
     
@@ -103,7 +110,7 @@ class Task:
         Returns:
             Dictionary representation of the task
         """
-        return {
+        result = {
             "id": self.id,
             "task": self.task,
             "description": self.description,
@@ -113,4 +120,14 @@ class Task:
             "dependencies": self.dependencies,
             "reason": self.reason
         }
+        
+        # Only include these if they have non-default values
+        if self.deadline_iso:
+            result["deadline_iso"] = self.deadline_iso
+        if self.confidence < 1.0:
+            result["confidence"] = self.confidence
+        if self.flag_for_review:
+            result["flag_for_review"] = self.flag_for_review
+            
+        return result
 

@@ -18,6 +18,58 @@ Why Whisper?
 
 import whisper  # type: ignore
 import os
+import re
+
+
+def clean_stt_output(text: str) -> str:
+    """
+    Clean up common Whisper transcription artifacts.
+    
+    Fixes:
+    - Spaced/hyphenated letters: "A D-D" → "Aditi"
+    - Common name mis-transcriptions
+    - Filler words (optional)
+    
+    Args:
+        text: Raw transcript from Whisper
+        
+    Returns:
+        Cleaned transcript text
+    """
+    # Step 1: Collapse spaced letters with hyphens: "A D-D" → "ADD"
+    text = re.sub(r'\b(\w)\s*-\s*(\w)\b', r'\1\2', text)
+    
+    # Step 2: Collapse spaced single letters: "A D D" → "ADD"
+    # This pattern matches 3+ single letters separated by spaces
+    def collapse_spaced_letters(match):
+        return ''.join(match.group(0).split())
+    text = re.sub(r'\b[A-Za-z](?:\s+[A-Za-z]){2,}\b', collapse_spaced_letters, text)
+    
+    # Step 3: Name correction lookup (extend as needed based on common errors)
+    NAME_CORRECTIONS = {
+        'roghav': 'Raghav',
+        'rhea': 'Riya',
+        'mayhole': 'Mehul',
+        'mayhol': 'Mehul',
+        'add': 'Aditi',
+        'addi': 'Aditi',
+        'adi': 'Aditi',
+    }
+    for wrong, right in NAME_CORRECTIONS.items():
+        text = re.sub(rf'\b{wrong}\b', right, text, flags=re.IGNORECASE)
+    
+    # Step 4: Remove common filler words/artifacts (optional, can be extended)
+    # Be careful not to remove legitimate words
+    FILLER_PATTERNS = [
+        r'\b(uh|um|uhm|hmm)\b',  # Filler sounds
+    ]
+    for pattern in FILLER_PATTERNS:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    
+    # Step 5: Collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text)
+    
+    return text.strip()
 
 
 class Transcriber:
@@ -94,7 +146,12 @@ class Transcriber:
         # - "language": Detected language
         transcript = result["text"].strip()
         
-        print(f"Transcription complete! ({len(transcript)} characters)")
+        print(f"Raw transcription: {len(transcript)} characters")
+        
+        # Clean up common STT artifacts (spaced letters, name errors, etc.)
+        transcript = clean_stt_output(transcript)
+        
+        print(f"Cleaned transcription: {len(transcript)} characters")
         
         return transcript
 
