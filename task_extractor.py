@@ -38,9 +38,7 @@ from rapidfuzz import fuzz, process
 from models import Task, TeamMember
 
 
-# =============================================================================
 # TRANSCRIPT NORMALIZATION
-# =============================================================================
 def normalize_transcript(transcript: str) -> str:
     """
     Clean and normalize the transcript text before processing.
@@ -221,9 +219,7 @@ class TaskExtractor:
     - False positive filtering
     """
     
-    # ==========================================================================
     # TASK DETECTION PATTERNS
-    # ==========================================================================
     # These phrases typically indicate a task is being assigned
     TASK_PATTERNS = [
         r'\bneed(?:s)?\s+to\b',           # "need to", "needs to"
@@ -278,9 +274,7 @@ class TaskExtractor:
         r'\btest(?:ing)?\s+(?:the\s+)?(?:for\s+)?(?:\w+\s+){0,2}(?:module|feature|cart|checkout)\b',
     ]
     
-    # ==========================================================================
     # FALSE POSITIVE PATTERNS (sentences to EXCLUDE)
-    # ==========================================================================
     # These sentences should NOT be treated as tasks
     # NOTE: We do NOT blanket-filter all questions (r'\?$') because some questions
     # contain direct assignments like "Ananya, can you handle that by tomorrow?"
@@ -295,9 +289,7 @@ class TaskExtractor:
         r'^why\s+(?:do|does|is|are)\b.*\?$',       # "Why is this broken?" type questions
     ]
     
-    # ==========================================================================
     # ASSIGNMENT QUESTION PATTERNS
-    # ==========================================================================
     # Questions that ARE task assignments - these should be treated as tasks
     # even though they end with "?"
     ASSIGNMENT_QUESTION_PATTERNS = [
@@ -306,9 +298,7 @@ class TaskExtractor:
         r'\bcould\s+you\s+(?:handle|do|take|finish|work\s+on)\b.*\?$', # "could you handle that?"
     ]
     
-    # ==========================================================================
     # CONTEXT SENTENCE PATTERNS
-    # ==========================================================================
     # Sentences that provide context for the PREVIOUS task (should be merged)
     # These start with pronouns referring to something mentioned before
     CONTEXT_PATTERNS = [
@@ -322,9 +312,7 @@ class TaskExtractor:
         r'^wait\s+(?:for|until)\b',                           # "Wait for...", "Wait until..."
     ]
     
-    # ==========================================================================
     # DEADLINE PATTERNS
-    # ==========================================================================
     DEADLINE_PATTERNS = [
         # Today patterns
         (r'\bby\s+today\b', 'Today'),
@@ -373,9 +361,7 @@ class TaskExtractor:
         (r'\burgently\b', 'Urgently'),
     ]
     
-    # ==========================================================================
     # PRIORITY MAPPING (Simple keyword-based)
-    # ==========================================================================
     # Maps keywords to priority levels - first match wins
     PRIORITY_MAP = {
         # Critical
@@ -410,9 +396,7 @@ class TaskExtractor:
         'eventually': 'Low',
     }
     
-    # ==========================================================================
     # DEPENDENCY PATTERNS
-    # ==========================================================================
     DEPENDENCY_PATTERNS = [
         r'\bdepends?\s+on\b',              # "depends on"
         r'\bafter\s+(?:the\s+)?(?:\w+\s+){0,3}(?:is\s+)?(?:done|completed?|finished)\b',

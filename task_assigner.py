@@ -119,9 +119,7 @@ class TaskAssigner:
     3. Assign to the highest-scoring member
     """
     
-    # ==========================================================================
     # ROLE KEYWORDS MAPPING
-    # ==========================================================================
     # Maps task keywords to relevant roles
     # If a task contains these keywords, prioritize people with matching roles
     ROLE_KEYWORDS = {
@@ -159,9 +157,7 @@ class TaskAssigner:
         ],
     }
     
-    # ==========================================================================
     # SKILL BOOSTERS
-    # ==========================================================================
     # These keywords in a task give extra weight to matching skills
     SKILL_BOOST_KEYWORDS = [
         'expert', 'good at', 'experienced', 'knows', 'worked on',

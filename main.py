@@ -150,9 +150,7 @@ def main():
     Parses arguments and runs the full pipeline:
     Audio -> Transcription -> Task Extraction -> Task Assignment -> Output
     """
-    # ==========================================================================
     # PARSE COMMAND LINE ARGUMENTS
-    # ==========================================================================
     parser = argparse.ArgumentParser(
         description="Meeting Task Assignment System - Extract and assign tasks from meeting audio",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -195,9 +193,7 @@ Examples:
     
     args = parser.parse_args()
     
-    # ==========================================================================
     # VALIDATE INPUTS
-    # ==========================================================================
     print("\n" + "="*60)
     print("MEETING TASK ASSIGNMENT SYSTEM")
     print("="*60)
@@ -221,9 +217,7 @@ Examples:
     print(f"Whisper model: {args.model}")
     print("="*60)
     
-    # ==========================================================================
     # STEP 1: LOAD TEAM MEMBERS
-    # ==========================================================================
     print("\n[STEP 1/4] Loading team members...")
     try:
         team_members = load_team_members(args.team)
@@ -234,9 +228,7 @@ Examples:
         print(f"Error loading team file: {e}")
         sys.exit(1)
     
-    # ==========================================================================
     # STEP 2: TRANSCRIBE AUDIO
-    # ==========================================================================
     print("\n[STEP 2/4] Transcribing audio...")
     try:
         transcriber = Transcriber(model_name=args.model)
@@ -249,9 +241,7 @@ Examples:
         print(f"Error transcribing audio: {e}")
         sys.exit(1)
     
-    # ==========================================================================
     # STEP 3: EXTRACT TASKS
-    # ==========================================================================
     print("\n[STEP 3/4] Extracting tasks...")
     try:
         extractor = TaskExtractor()
@@ -267,9 +257,7 @@ Examples:
         print(f"Error extracting tasks: {e}")
         sys.exit(1)
     
-    # ==========================================================================
     # STEP 4: ASSIGN TASKS
-    # ==========================================================================
     print("\n[STEP 4/4] Assigning tasks to team members...")
     try:
         assigner = TaskAssigner(team_members)
@@ -278,9 +266,7 @@ Examples:
         print(f"Error assigning tasks: {e}")
         sys.exit(1)
     
-    # ==========================================================================
     # OUTPUT RESULTS
-    # ==========================================================================
     # Print to console
     print_tasks_table(assigned_tasks)
     
