@@ -10,7 +10,7 @@ Transforms raw meeting audio into structured, auto-assigned task lists using loc
 ## Problem Statement
 Teams leave meetings with fuzzy notes, missed owners, and unclear deadlines, forcing manual transcription, task extraction, and coordination that slows delivery and creates accountability gaps.
 
-## High-Level Solution Overview
+## Solution Overview
 This system ingests meeting audio, transcribes it locally via Whisper, parses the transcript with custom NLP rules to detect actionable work, and intelligently assigns each task to the best-fit team member before exporting a review-ready JSON file and console table.
 
 ## Architecture Diagram
