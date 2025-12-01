@@ -1,24 +1,24 @@
 {
-  "team_members": [
+  "team": [
     {
-      "name": "Mehul",
-      "role": "iOS Developer",
-      "skills": ["Swift", "iOS builds", "Environment keys"]
+      "name": "Sakshi",
+      "role": "Frontend Developer",
+      "skills": ["React", "JavaScript", "UI bugs"]
     },
     {
-      "name": "Sarah",
-      "role": "Designer",
-      "skills": ["Screenshots", "App Store assets", "Design"]
+      "name": "Mohit",
+      "role": "Backend Engineer",
+      "skills": ["Database", "APIs", "Performance optimization"]
     },
     {
-      "name": "Priya",
-      "role": "Legal Reviewer",
-      "skills": ["Legal", "Contracts", "Review"]
+      "name": "Arjun",
+      "role": "UI/UX Designer",
+      "skills": ["Figma", "User flows", "Mobile design"]
     },
     {
-      "name": "DevOps",
-      "role": "DevOps Engineer",
-      "skills": ["Deployment", "CI/CD", "Production updates"]
+      "name": "Lata",
+      "role": "QA Engineer",
+      "skills": ["Testing", "Automation", "Quality assurance"]
     }
   ]
 }
