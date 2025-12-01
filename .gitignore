@@ -10,7 +10,7 @@ __pycache__/
 .vscode/
 .idea/
 
-# Audio files (optional - remove this line if you want to include meeting.mp3)
+# Audio files 
 *.mp3
 
 # Output files
