@@ -10,8 +10,6 @@ __pycache__/
 .vscode/
 .idea/
 
-# Audio files 
-*.mp3
 
 # Output files
 tasks.json
