@@ -144,7 +144,7 @@ class Transcriber:
         # - "text": The full transcription (what we want)
         # - "segments": Timestamped chunks of text
         # - "language": Detected language
-        transcript = result["text"].strip()
+        transcript = result["text"].strip() # type: ignore
         
         print(f"Raw transcription: {len(transcript)} characters")
         
