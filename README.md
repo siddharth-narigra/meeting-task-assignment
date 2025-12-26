@@ -66,7 +66,7 @@ flowchart LR
 ```
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Transcriber["transcriber.py"]
         T1[Load Whisper Model] --> T2[Transcribe Audio]
         T2 --> T3[Clean STT Artifacts]
@@ -74,16 +74,16 @@ flowchart TB
     end
 
     subgraph Extractor["task_extractor.py"]
-        E1[Normalize Transcript] --> E2[Sentence Segmentation<br>spaCy]
-        E2 --> E3[Task Detection<br>50+ Regex Patterns]
+        E1[Normalize Transcript] --> E2[Sentence Segmentation]
+        E2 --> E3[Task Detection]
         E3 --> E4[Extract Deadlines]
         E4 --> E5[Extract Priority]
         E5 --> E6[Detect Dependencies]
-        E6 --> E7[Find Person Mentions<br>Fuzzy Matching]
+        E6 --> E7[Find Person Mentions]
     end
 
     subgraph Assigner["task_assigner.py"]
-        A1[Validate Direct Mentions] --> A2[Handle Someone Assignments]
+        A1[Validate Mentions] --> A2[Handle Implicit Assigns]
         A2 --> A3[Calculate Skill Score]
         A3 --> A4[Calculate Role Score]
         A4 --> A5[Select Best Assignee]
