@@ -21,10 +21,10 @@ import os
 import sys
 from typing import List
 
-from models import Task, TeamMember
-from transcriber import Transcriber
-from task_extractor import TaskExtractor
-from task_assigner import TaskAssigner
+from src.models import Task, TeamMember
+from src.transcriber import Transcriber
+from src.task_extractor import TaskExtractor
+from src.task_assigner import TaskAssigner
 
 
 def load_team_members(json_path: str) -> List[TeamMember]:

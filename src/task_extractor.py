@@ -35,7 +35,7 @@ import dateparser
 from datetime import datetime
 from typing import List, Tuple, Optional, Any
 from rapidfuzz import fuzz, process
-from models import Task, TeamMember
+from .models import Task, TeamMember
 
 
 # TRANSCRIPT NORMALIZATION

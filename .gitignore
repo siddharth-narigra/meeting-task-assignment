@@ -1,15 +1,4 @@
-# Virtual environment
 venv/
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-
-# IDE settings
-.vscode/
-.idea/
-
-
-# Output files
-tasks.json
+tasks_output.json
+output/

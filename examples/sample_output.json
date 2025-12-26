@@ -1,0 +1,54 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "task": "Fix checkout crash",
+      "description": "we need someone to fix the checkout crash before Friday",
+      "assigned_to": "Mohit",
+      "deadline": "Friday",
+      "deadline_iso": "2025-12-27T00:00:00+05:30",
+      "priority": "High",
+      "dependencies": [],
+      "reason": "Skills: Database, APIs; Backend Engineer matches task type"
+    },
+    {
+      "id": 2,
+      "task": "Handle login bug regression",
+      "description": "Sakshi, please handle the login bug regression by tomorrow evening",
+      "assigned_to": "Sakshi",
+      "deadline": "Tomorrow evening",
+      "deadline_iso": "2025-12-27T18:00:00+05:30",
+      "priority": "Critical",
+      "dependencies": [],
+      "reason": "Directly mentioned in meeting"
+    },
+    {
+      "id": 3,
+      "task": "Design new onboarding screens",
+      "description": "Someone should design the new onboarding screens for the next sprint",
+      "assigned_to": "Arjun",
+      "deadline": "Next sprint",
+      "priority": "Medium",
+      "dependencies": [],
+      "reason": "Skills: User flows, Onboarding; UI/UX Designer matches task type",
+      "flag_for_review": true
+    },
+    {
+      "id": 4,
+      "task": "Write unit tests for payment module",
+      "description": "We need to write unit tests for the payment module after the login bug is fixed",
+      "assigned_to": "Lata",
+      "deadline": "End of week",
+      "priority": "Medium",
+      "dependencies": [2],
+      "reason": "Skills: Testing, Automation, Unit tests; QA Engineer matches task type"
+    }
+  ],
+  "metadata": {
+    "audio_file": "meeting.mp3",
+    "whisper_model": "base",
+    "team_size": 4,
+    "total_tasks": 4,
+    "generated_at": "2025-12-26T16:00:00+05:30"
+  }
+}

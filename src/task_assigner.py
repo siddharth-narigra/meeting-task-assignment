@@ -18,7 +18,7 @@ Why this approach?
 import re
 from typing import List, Dict, Optional, Tuple
 from rapidfuzz import fuzz, process
-from models import Task, TeamMember
+from .models import Task, TeamMember
 
 
 def match_name_to_team(recognized_name: str, team_members: List[TeamMember], threshold: int = 60) -> Optional[str]:

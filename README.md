@@ -1,184 +1,282 @@
 # Meeting Task Assignment System
+
+**Converts meeting audio → structured, assigned task list using local Whisper + rule-based NLP.**
+
 ![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![OpenAI Whisper](https://img.shields.io/badge/STT-OpenAI%20Whisper-orange.svg)
 ![spaCy NLP](https://img.shields.io/badge/NLP-spaCy-09a3d5.svg)
 ![FFmpeg](https://img.shields.io/badge/Audio-FFmpeg-lightgrey.svg)
 
-Transforms raw meeting audio into structured, auto-assigned task lists using local Whisper transcription and rule-based NLP.
+---
 
-## Problem Statement
-Teams leave meetings with fuzzy notes, missed owners, and unclear deadlines, forcing manual transcription, task extraction, and coordination that slows delivery and creates accountability gaps.
+## Problem
 
-## Solution Overview
-This system ingests meeting audio, transcribes it locally via Whisper, parses the transcript with custom NLP rules to detect actionable work, and intelligently assigns each task to the best-fit team member before exporting a review-ready JSON file and console table.
+After a meeting recording, extracting tasks requires:
 
-## Architecture Diagram
-![Meeting Task Assignment Architecture](architecture.png)
+1. Transcribing the audio
+2. Identifying actionable items from conversation
+3. Matching tasks to team members based on mentions or skills
+4. Parsing deadlines from natural language
 
-## Architecture Explanation
-- **Audio Ingestion & Validation**: `main.py` verifies file type (`.wav`, `.mp3`, `.m4a`) and prepares run metadata.
-- **Speech-to-Text Module**: `transcriber.py` loads the selected Whisper model and produces a cleaned transcript.
-- **Sentence Segmentation & Normalization**: `task_extractor.py` normalizes punctuation, splits sentences with spaCy, and filters non-actionable chatter.
-- **Task Extraction Engine**: Pattern libraries detect task verbs, deadlines, priorities, dependencies, and person mentions; matched snippets become `Task` objects.
-- **Assignment Engine**: `task_assigner.py` keeps direct mentions, resolves “someone” phrases by role, then scores skills/roles to pick the best owner and link dependencies.
-- **Output Formatter**: `main.py` prints a CLI table for humans and serializes structured JSON via `Task.to_dict()` for downstream systems.
+This system automates that pipeline.
 
-## Key Features
-- Local Whisper-powered speech-to-text (no API keys once models cached).
-- Rule-based NLP task extraction with deadline, priority, and dependency parsing.
-- Skill-, role-, and mention-aware task assignment for transparent ownership.
-- JSON export plus CLI table summary for instant review.
-- Configurable Whisper model sizes for speed vs. accuracy trade-offs.
+---
 
-## Tech Stack (With Purpose)
-- **Python 3.8+**: Primary runtime orchestrating the pipeline.
-- **OpenAI Whisper (via `whisper` library)**: Offline transcription of meeting audio.
-- **spaCy (`en_core_web_sm`)**: Sentence segmentation and linguistic features for task detection.
-- **dateparser**: Converts natural language deadlines (“next Friday”) into normalized values.
-- **rapidfuzz**: Fuzzy name matching to handle transcription errors in person mentions.
-- **FFmpeg**: Required by Whisper to decode assorted audio formats.
+## Solution
 
-## System Workflow (Chronological Processing Steps)
-1. Validate CLI arguments and input files.
-2. Load team roster from JSON into `TeamMember` dataclasses.
-3. Transcribe audio to text using the selected Whisper model.
-4. Normalize transcript, split sentences, and detect actionable statements.
-5. Extract deadlines, priorities, dependencies, and referenced people.
-6. Instantiate `Task` objects and run assignment logic to pick owners.
-7. Print a formatted CLI table for quick inspection.
-8. Persist tasks to `tasks_output.json` (or custom path) for integrations.
+Feed in a meeting audio file + team roster → get back a structured JSON with:
 
-## Input Format
-- **Audio**: `.wav`, `.mp3`, or `.m4a`. Other formats are rejected early with a helpful message.
-- **Team JSON** (`sample_team.json` template):
-  ```json
-  {
-    "team_members": [
-      {
-        "name": "Sakshi",
-        "role": "Frontend Developer",
-        "skills": ["React", "JavaScript", "UI bugs"]
-      }
-    ]
-  }
-  ```
+- Extracted tasks (filtered from chatter)
+- Auto-assigned owners (based on mentions, skills, roles)
+- Parsed deadlines (natural language → ISO 8601)
+- Priority levels (keyword-based detection)
+- Task dependencies (when mentioned)
 
-## Output Format
-- **JSON** (`tasks_output.json` by default):
-  ```json
-  {
-    "tasks": [
-      {
-        "id": 1,
-        "task": "Fix login bug",
-        "description": "We need to fix the login bug before Friday's release.",
-        "assigned_to": "Sakshi",
-        "deadline": "Friday evening",
-        "deadline_iso": "2025-05-09T18:00:00+05:30",
-        "priority": "High",
-        "dependencies": [],
-        "reason": "Skills: React, UI bugs"
-      }
-    ]
-  }
-  ```
-- **Console Table** (auto-printed by `main.py`):
-  ```
-  #   Task                             Assigned To     Deadline             Priority
-  ------------------------------------------------------------------------------------
-  1   Fix login bug                   Sakshi          Friday evening       High
-  ```
+Everything runs locally. No API calls after initial model download.
 
-## Example Input & Example Output
-- **Transcript Snippet**
-  ```
-  “Team, we need someone to fix the checkout crash before Friday. Sakshi, please handle the login bug regression by tomorrow evening.”
-  ```
-- **Resulting JSON**
-  ```json
-  {
-    "tasks": [
-      {
-        "id": 1,
-        "task": "Fix checkout crash",
-        "description": "we need someone to fix the checkout crash before Friday",
-        "assigned_to": "Mohit",
-        "deadline": "Friday",
-        "priority": "High",
-        "dependencies": [],
-        "reason": "Skills: Database, APIs"
-      },
-      {
-        "id": 2,
-        "task": "Handle login bug regression",
-        "description": "Sakshi, please handle the login bug regression by tomorrow evening",
-        "assigned_to": "Sakshi",
-        "deadline": "Tomorrow evening",
-        "priority": "Critical",
-        "dependencies": [],
-        "reason": "Directly mentioned in meeting"
-      }
-    ]
-  }
-  ```
-- **Formatted Table**
-  ```
-  #   Task                             Assigned To     Deadline             Priority
-  ------------------------------------------------------------------------------------
-  1   Fix checkout crash              Mohit           Friday               High
-  2   Handle login bug regression     Sakshi          Tomorrow evening     Critical
-  ```
+---
 
-## Installation Instructions
-1. Install FFmpeg (e.g., `choco install ffmpeg`, `brew install ffmpeg`, or `sudo apt install ffmpeg`).
-2. Clone the repo and create a virtual environment:
-   ```
-   python -m venv venv
-   venv\Scripts\activate  # Windows
-   source venv/bin/activate  # macOS/Linux
-   ```
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   python -m spacy download en_core_web_sm
-   ```
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Input
+        A1[Audio File<br>.mp3 / .wav / .m4a]
+        A2[Team Roster<br>JSON]
+    end
+
+    subgraph Pipeline
+        B[Transcriber<br>Whisper STT]
+        C[TaskExtractor<br>spaCy + Patterns]
+        D[TaskAssigner<br>Skill Scoring]
+    end
+
+    subgraph Output
+        E1[JSON File<br>Structured Tasks]
+        E2[CLI Table<br>Human Summary]
+    end
+
+    A1 --> B
+    B -->|Raw Transcript| C
+    C -->|Task Objects| D
+    A2 --> D
+    D --> E1
+    D --> E2
+```
+
+```mermaid
+flowchart TB
+    subgraph Transcriber["transcriber.py"]
+        T1[Load Whisper Model] --> T2[Transcribe Audio]
+        T2 --> T3[Clean STT Artifacts]
+        T3 --> T4[Fix Name Errors]
+    end
+
+    subgraph Extractor["task_extractor.py"]
+        E1[Normalize Transcript] --> E2[Sentence Segmentation<br>spaCy]
+        E2 --> E3[Task Detection<br>50+ Regex Patterns]
+        E3 --> E4[Extract Deadlines]
+        E4 --> E5[Extract Priority]
+        E5 --> E6[Detect Dependencies]
+        E6 --> E7[Find Person Mentions<br>Fuzzy Matching]
+    end
+
+    subgraph Assigner["task_assigner.py"]
+        A1[Validate Direct Mentions] --> A2[Handle Someone Assignments]
+        A2 --> A3[Calculate Skill Score]
+        A3 --> A4[Calculate Role Score]
+        A4 --> A5[Select Best Assignee]
+        A5 --> A6[Resolve Dependencies]
+    end
+
+    T4 --> E1
+    E7 --> A1
+```
+
+### Module Responsibilities
+
+| File                      | What it does                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `main.py`               | CLI entry point, orchestrates pipeline, handles I/O                                        |
+| `src/transcriber.py`    | Whisper wrapper, cleans STT artifacts (spaced letters, name errors)                        |
+| `src/task_extractor.py` | Sentence segmentation, task detection via 50+ regex patterns, deadline/priority extraction |
+| `src/task_assigner.py`  | Skill scoring, role matching, fuzzy name resolution, dependency linking                    |
+| `src/models.py`         | `Task` and `TeamMember` dataclasses                                                    |
+
+---
+
+## Engineering Decisions
+
+| Decision                                     | Why                                                                                                                                            |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Rule-based NLP instead of LLMs**     | Predictable behavior, no API costs, works offline, fast. Meeting language is formulaic enough that patterns work.                              |
+| **Local Whisper instead of cloud STT** | Privacy (meetings contain sensitive info), no per-minute billing, works without internet.                                                      |
+| **Fuzzy name matching (rapidfuzz)**    | Whisper often mishears names ("Sakshi" → "Sokshi"). 65% threshold catches these without false positives.                                      |
+| **spaCy for sentence splitting only**  | Robust sentence boundary detection. Task detection uses custom patterns because spaCy's NER doesn't understand "task assignment" as a concept. |
+| **JSON output instead of database**    | Simplicity. Output is meant for integration with existing tools (Jira, Notion, etc.), not as a standalone app.                                 |
+| **Dataclasses over dicts**             | Type safety, IDE autocomplete, cleaner code. Small overhead, major maintainability gain.                                                       |
+
+---
+
+## Features
+
+- **Task filtering**: Ignores greetings, rhetorical questions, discussions. Extracts actionable statements.
+- **Fuzzy name matching**: Corrects Whisper transcription errors ("Sokshi" → "Sakshi").
+- **Deadline parsing**: "tomorrow evening", "before Friday's release" → ISO 8601 datetime.
+- **Priority detection**: Keywords like "critical", "blocking", "ASAP" → priority levels.
+- **Implicit assignment resolution**: "Someone from backend should handle this" → assigns to backend engineer.
+- **Dependency linking**: "This depends on the login fix" → links task IDs.
+
+---
+
+## Tech Stack
+
+| Tool                     | Purpose                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| **OpenAI Whisper** | Local speech-to-text. No API key needed after model caches (~140MB for base). |
+| **spaCy**          | Sentence segmentation.`en_core_web_sm` model.                               |
+| **rapidfuzz**      | Fast fuzzy string matching for name resolution.                               |
+| **dateparser**     | Natural language → datetime conversion with timezone awareness.              |
+| **FFmpeg**         | Required by Whisper to decode audio formats. System dependency.               |
+
+---
+
+## Input / Output
+
+### Input
+
+**Audio**: `.wav`, `.mp3`, `.m4a`
+
+**Team roster** (`examples/sample_team.json`):
+
+```json
+{
+  "team_members": [
+    {
+      "name": "Sakshi",
+      "role": "Frontend Developer",
+      "skills": ["React", "JavaScript", "UI bugs"]
+    }
+  ]
+}
+```
+
+### Output
+
+**JSON** (`tasks_output.json`):
+
+```json
+{
+  "tasks": [
+    {
+      "id": 1,
+      "task": "Fix checkout crash",
+      "description": "we need someone to fix the checkout crash before Friday",
+      "assigned_to": "Mohit",
+      "deadline": "Friday",
+      "deadline_iso": "2025-12-27T00:00:00+05:30",
+      "priority": "High",
+      "dependencies": [],
+      "reason": "Skills: Database, APIs; Backend Engineer matches task type"
+    }
+  ]
+}
+```
+
+**CLI table** (printed to stdout):
+
+```
+#   Task                        Assigned To     Deadline        Priority
+--------------------------------------------------------------------------------
+1   Fix checkout crash          Mohit           Friday          High
+2   Handle login bug            Sakshi          Tomorrow        Critical
+```
+
+---
 
 ## How to Run
-1. **Transcribe + Extract + Assign in one command**
-   ```
-   python main.py --audio meeting.mp3 --team sample_team.json --output tasks.json
-   ```
-2. **Specify Whisper model for accuracy/speed trade-off**
-   ```
-   python main.py -a meeting.mp3 -t sample_team.json -m small
-   ```
-3. **Preview help/options**
-   ```
-   python main.py -h
-   ```
 
-## Folder Structure
+### Prerequisites
+
+```bash
+# Install FFmpeg (required for Whisper)
+# Windows: choco install ffmpeg
+# Mac: brew install ffmpeg
+# Linux: sudo apt install ffmpeg
 ```
-task/
-├── main.py               # CLI orchestrator
-├── transcriber.py        # Whisper wrapper
-├── task_extractor.py     # NLP task extraction
-├── task_assigner.py      # Assignment logic
-├── models.py             # Dataclasses
-├── sample_team.json      # Template team config
-├── requirements.txt      # Python deps
-├── meeting.mp3           # Sample audio
-└── README.md             # This document
+
+### Setup
+
+```bash
+git clone <repo>
+cd meeting-task-assignment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 ```
+
+### Run
+
+```bash
+# Basic usage
+python main.py --audio examples/meeting.mp3 --team examples/sample_team.json --output tasks.json
+
+# With different Whisper model (tiny/base/small/medium/large)
+python main.py -a examples/meeting.mp3 -t examples/sample_team.json -m small
+
+# Help
+python main.py -h
+```
+
+---
+
+## Repository Structure
+
+```
+meeting-task-assignment/
+├── src/                      # Source code
+│   ├── __init__.py           # Package exports
+│   ├── transcriber.py        # Whisper wrapper + STT cleanup
+│   ├── task_extractor.py     # NLP patterns + extraction logic
+│   ├── task_assigner.py      # Assignment scoring + matching
+│   └── models.py             # Task, TeamMember dataclasses
+├── examples/                 # Sample files for testing
+│   ├── meeting.mp3           # Sample meeting audio
+│   ├── sample_team.json      # Team configuration
+│   └── sample_output.json    # Example output
+├── main.py                   # CLI entry point
+├── architecture.png          # System diagram
+├── requirements.txt          # Python dependencies
+├── LICENSE                   # MIT
+└── README.md
+```
+
+---
 
 ## Limitations
-- Whisper transcription quality depends on audio clarity and may mis-hear niche names.
-- Rule-based NLP can miss highly informal phrasing or novel task wording.
-- No built-in diarization; speaker identification relies solely on text cues.
-- Runs on CPU by default, so long recordings can take several minutes.
-- Currently single-language focus (English) aligned with the shipped spaCy model.
+
+- **Audio quality dependent**: Whisper accuracy drops with heavy accents, crosstalk, or poor microphones.
+- **English only**: spaCy model and regex patterns are English-specific.
+- **No speaker diarization**: Cannot identify who said what. Relies on text cues.
+- **Pattern coverage**: Novel phrasing may not match existing regex patterns.
+- **CPU-bound**: Whisper on CPU: ~1 min audio ≈ 30 sec processing (base model).
+- **Static rules**: Does not learn or improve from corrections.
+
+---
+
+## Future Improvements
+
+- [ ] Add speaker diarization (pyannote.audio) to attribute statements to speakers
+- [ ] GPU acceleration for Whisper (significant speedup for long meetings)
+- [ ] Confidence scores per task with human review flags
+- [ ] Export to Jira/Trello/Notion via their APIs
+- [ ] Web UI for non-technical users
+- [ ] Multi-language support (swap spaCy model + translate patterns)
+
+---
 
 ## License
-[MIT License](LICENSE)
 
+[MIT License](LICENSE)
