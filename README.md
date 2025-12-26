@@ -10,30 +10,17 @@
 
 ---
 
-## Problem
+## Overview
 
-After a meeting recording, extracting tasks requires:
+A CLI tool that takes meeting audio and a team roster as input, then outputs:
 
-1. Transcribing the audio
-2. Identifying actionable items from conversation
-3. Matching tasks to team members based on mentions or skills
-4. Parsing deadlines from natural language
-
-This system automates that pipeline.
-
----
-
-## Solution
-
-Feed in a meeting audio file + team roster → get back a structured JSON with:
-
-- Extracted tasks (filtered from chatter)
+- Extracted tasks with descriptions
 - Auto-assigned owners (based on mentions, skills, roles)
 - Parsed deadlines (natural language → ISO 8601)
-- Priority levels (keyword-based detection)
-- Task dependencies (when mentioned)
+- Priority levels
+- Task dependencies
 
-Everything runs locally. No API calls after initial model download.
+Runs entirely locally using OpenAI Whisper for transcription and custom regex patterns for task extraction.
 
 ---
 
@@ -68,12 +55,14 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Transcriber["transcriber.py"]
+        direction TB
         T1[Load Whisper Model] --> T2[Transcribe Audio]
         T2 --> T3[Clean STT Artifacts]
         T3 --> T4[Fix Name Errors]
     end
 
     subgraph Extractor["task_extractor.py"]
+        direction TB
         E1[Normalize Transcript] --> E2[Sentence Segmentation]
         E2 --> E3[Task Detection]
         E3 --> E4[Extract Deadlines]
@@ -83,6 +72,7 @@ flowchart LR
     end
 
     subgraph Assigner["task_assigner.py"]
+        direction TB
         A1[Validate Mentions] --> A2[Handle Implicit Assigns]
         A2 --> A3[Calculate Skill Score]
         A3 --> A4[Calculate Role Score]
@@ -90,8 +80,8 @@ flowchart LR
         A5 --> A6[Resolve Dependencies]
     end
 
-    T4 --> E1
-    E7 --> A1
+    Transcriber --> Extractor
+    Extractor --> Assigner
 ```
 
 ### Module Responsibilities
